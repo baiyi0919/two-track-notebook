@@ -1,0 +1,56 @@
+# 编译输出
+**/target/
+**/unpackage/
+**/dist/
+**/build/
+**/*.log
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 依赖
+**/node_modules/
+**/.mvn/
+**/*.jar
+**/*.war
+
+# 环境变量和敏感信息
+**/.env
+**/.env.*
+**/application-prod.yml
+**/application-dev.yml.bak
+
+# 数据库初始化脚本（如果包含敏感数据）
+# sql/
+
+# 临时文件
+**/temp/
+**/tmp/
+**/*.tmp
+
+# 日志
+**/logs/
+*.log
+
+# Maven wrapper
+**/.mvn/wrapper/maven-wrapper.jar
+
+# 前端依赖
+**/package-lock.json
+**/yarn.lock
+**/pnpm-lock.yaml
+
+# 测试覆盖率
+**/coverage/
+**/*.coverage
+
+# 特定于Windows
+desktop.ini

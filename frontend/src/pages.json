@@ -1,0 +1,112 @@
+{
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationBarTitleText": "现实轨",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/explore/index",
+      "style": {
+        "navigationBarTitleText": "探索轨",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/principle/index",
+      "style": {
+        "navigationBarTitleText": "原则库"
+      }
+    },
+    {
+      "path": "pages/mine/index",
+      "style": {
+        "navigationBarTitleText": "我的"
+      }
+    },
+    {
+      "path": "pages/login/index",
+      "style": {
+        "navigationBarTitleText": "登录",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/index/detail",
+      "style": {
+        "navigationBarTitleText": "任务详情"
+      }
+    },
+    {
+      "path": "pages/explore/detail",
+      "style": {
+        "navigationBarTitleText": "议题详情"
+      }
+    },
+    {
+      "path": "pages/mine/report",
+      "style": {
+        "navigationBarTitleText": "注意力报告"
+      }
+    },
+    {
+      "path": "pages/principle/detail",
+      "style": {
+        "navigationBarTitleText": "原则详情"
+      }
+    },
+    {
+      "path": "pages/calendar/index",
+      "style": {
+        "navigationBarTitleText": "日历视图"
+      }
+    },
+    {
+      "path": "pages/index/flow",
+      "style": {
+        "navigationBarTitleText": "心流模式",
+        "navigationStyle": "custom"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "双轨笔记本",
+    "navigationBarBackgroundColor": "#FFFFFF",
+    "backgroundColor": "#F5F5F5"
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#6C5CE7",
+    "borderStyle": "black",
+    "backgroundColor": "#FFFFFF",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "现实轨",
+        "iconPath": "static/tab_task.png",
+        "selectedIconPath": "static/tab_task_active.png"
+      },
+      {
+        "pagePath": "pages/explore/index",
+        "text": "探索轨",
+        "iconPath": "static/tab_explore.png",
+        "selectedIconPath": "static/tab_explore_active.png"
+      },
+      {
+        "pagePath": "pages/principle/index",
+        "text": "原则库",
+        "iconPath": "static/tab_principle.png",
+        "selectedIconPath": "static/tab_principle_active.png"
+      },
+      {
+        "pagePath": "pages/mine/index",
+        "text": "我的",
+        "iconPath": "static/tab_mine.png",
+        "selectedIconPath": "static/tab_mine_active.png"
+      }
+    ]
+  }
+}

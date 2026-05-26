@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device, initial-scale=1.0">
+<title>探索轨 - 多人模式原型 v2</title>
+<style>
+  * { margin:0; padding:0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; }
+
+  .page { display: flex; flex-direction: column; height: 100vh; max-width: 500px; margin: 0 auto; background: #f5f5f5; position: relative; }
+
+  /* 顶部导航 */
+  .navbar { background: #fff; padding: 12px 20px; display: flex; align-items: center; border-bottom: 1px solid #e8e8e8; flex-shrink: 0; }
+  .navbar .back { color: #666; margin-right: 16px; cursor: pointer; font-size: 18px; }
+  .navbar .title { font-size: 17px; font-weight: 600; flex: 1; }
+  .navbar .actions { display: flex; gap: 12px; }
+  .navbar .action-btn { background: none; border: 1px solid #ddd; border-radius: 8px; padding: 6px 14px; font-size: 13px; cursor: pointer; color: #555; transition: all 0.2s; }
+  .navbar .action-btn.active { background: #4A90D6; color: #fff; border-color: #4A90D6; }
+
+  /* 模式切换 */
+  .mode-switch { display: flex; background: #f0f0f0; border-radius: 10px; padding: 3px; margin: 16px 20px 0; flex-shrink: 0; }
+  .mode-switch .tab { flex: 1; text-align: center; padding: 8px; border-radius: 8px; font-size: 14px; cursor: pointer; color: #888; transition: all 0.2s; }
+  .mode-switch .tab.active { background: #fff; color: #333; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+  /* 角色栏（多人模式） */
+  .persona-bar { display: flex; gap: 12px; padding: 12px 20px; overflow-x: auto; border-bottom: 1px solid #eee; background: #fff; flex-shrink: 0; -webkit-overflow-scrolling: touch; }
+  .persona-bar .persona-card { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; min-width: 64px; position: relative; }
+  .persona-card .avatar { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff; font-weight: 600; position: relative; transition: transform 0.15s; user-select: none; -webkit-user-select: none; }
+  .persona-card .avatar:active { transform: scale(0.92); }
+  .persona-card .avatar.me { background: linear-gradient(135deg, #4A90D6, #7B68EE); }
+  .persona-card .avatar.ai1 { background: linear-gradient(135deg, #FF6B6B, #FF8E53); }
+  .persona-card .avatar.ai2 { background: linear-gradient(135deg, #4ECDC4, #44B09E); }
+  .persona-card .avatar.ai3 { background: linear-gradient(135deg, #FC5C7C, #6A82FB); }
+  .persona-card .name { font-size: 11px; color: #666; max-width: 64px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .persona-card.active .name { color: #4A90D6; font-weight: 600; }
+  .persona-card .speaking { width: 8px; height: 8px; border-radius: 50%; background: #4A90D6; position: absolute; bottom: 2px; right: 2px; border: 2px solid #fff; display: none; }
+  .persona-card.speaking .speaking { display: block; }
+  .persona-card .add-btn { width: 44px; height: 44px; border-radius: 50%; border: 2px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #ccc; background: #fafafa; cursor: pointer; transition: all 0.15s; }
+  .persona-card .add-btn:hover { border-color: #4A90D6; color: #4A90D6; }
+  /* 长按提示 */
+  .persona-card .longpress-hint { display: none; position: absolute; top: -32px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; font-size: 11px; padding: 4px 10px; border-radius: 6px; white-space: nowrap; pointer-events: none; }
+  .persona-card .longpress-hint::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: #333; }
+  .persona-card:active .longpress-hint { display: block; }
+
+  /* 单人模式角色切换 */
+  .role-switch-bar { display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: #fff; border-bottom: 1px solid #eee; flex-shrink: 0; }
+  .role-switch-bar .label { font-size: 12px; color: #999; }
+  .role-switch-bar select { border: 1px solid #e0e0e0; border-radius: 8px; padding: 4px 10px; font-size: 13px; outline: none; background: #fff; }
+
+  /* 对话区 */
+  .chat-area { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 16px; -webkit-overflow-scrolling: touch; }
+  .message { display: flex; gap: 10px; max-width: 88%; animation: msgIn 0.25s ease; }
+  @keyframes msgIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .message.mine { flex-direction: row-reverse; align-self: flex-end; }
+  .msg-avatar-wrapper { display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; flex-shrink: 0; }
+  .msg-avatar-wrapper .msg-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #fff; flex-shrink: 0; }
+  .msg-avatar-wrapper .msg-name { font-size: 9px; color: #aaa; max-width: 48px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .message .speaker { font-size: 11px; color: #999; margin-bottom: 2px; display: flex; align-items: center; gap: 6px; }
+  .message .speaker .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+  .message .bubble { background: #fff; border-radius: 14px; padding: 12px 16px; font-size: 14px; line-height: 1.6; color: #333; box-shadow: 0 1px 2px rgba(0,0,0,0.04); word-break: break-word; }
+  .message.mine .bubble { background: #4A90D6; color: #fff; border-bottom-right-radius: 4px; }
+  .message:not(.mine) .bubble { border-bottom-left-radius: 4px; }
+  .framework-tag { display: inline-flex; align-items: center; gap: 3px; background: #f0f4ff; color: #4A90D6; font-size: 11px; padding: 3px 10px; border-radius: 10px; margin-top: 6px; cursor: default; }
+  .ref-tag { display: inline-flex; align-items: center; gap: 3px; background: #f9f9f9; border: 1px solid #eee; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-top: 6px; color: #666; cursor: pointer; }
+  .ref-tag:hover { background: #f0f0f0; }
+  .ai-thinking { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: #fafafa; border-radius: 14px; border-bottom-left-radius: 4px; max-width: 88%; align-self: flex-start; }
+
+  /* 消息卡片菜单 */
+  .bubble-wrap { display: flex; flex-direction: column; gap: 4px; position: relative; }
+  .msg-menu-btn { position: absolute; top: 2px; right: 4px; width: 24px; height: 24px; border-radius: 50%; border: none; background: transparent; color: #ccc; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; z-index: 5; }
+  .msg-menu-btn:hover { background: #f0f0f0; color: #888; }
+  .message.mine .msg-menu-btn { right: auto; left: 4px; color: rgba(255,255,255,0.7); }
+  .message.mine .msg-menu-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+  .msg-menu { position: absolute; top: 28px; right: 0; background: #fff; border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); padding: 6px 0; min-width: 110px; z-index: 20; display: none; animation: menuIn 0.15s ease; }
+  .message.mine .msg-menu { right: auto; left: 0; }
+  .msg-menu.show { display: block; }
+  @keyframes menuIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+  .msg-menu-item { padding: 9px 16px; font-size: 13px; color: #333; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.1s; }
+  .msg-menu-item:hover { background: #f5f5f5; }
+  .msg-menu-item.delete { color: #FF4D4F; }
+  .msg-menu-item.delete:hover { background: #fff1f0; }
+  .msg-deleted { font-style: italic; color: #aaa; font-size: 13px; }
+  .ai-thinking .dots { display: flex; gap: 4px; }
+  .ai-thinking .dots span { width: 6px; height: 6px; border-radius: 50%; background: #ccc; animation: blink 1.2s infinite; }
+  .ai-thinking .dots span:nth-child(2) { animation-delay: 0.2s; }
+  .ai-thinking .dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%,80%,100% { opacity: 0.3; } 40% { opacity: 1; } }
+  .ai-thinking .label { font-size: 12px; color: #aaa; }
+
+  /* 输入区 */
+  .input-area { display: flex; align-items: flex-end; gap: 10px; padding: 12px 20px; background: #fff; border-top: 1px solid #eee; flex-shrink: 0; }
+  .input-area .left-btns { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+  .input-area .auto-btn { background: none; border: 1px solid #ddd; border-radius: 10px; padding: 6px 10px; font-size: 11px; cursor: pointer; color: #888; white-space: nowrap; transition: all 0.2s; }
+  .input-area .auto-btn.active { border-color: #4A90D6; color: #4A90D6; background: #f0f4ff; }
+  .input-area .round-input { border: 1px solid #ddd; border-radius: 6px; padding: 3px 6px; font-size: 12px; width: 48px; text-align: center; outline: none; }
+  .input-area .round-input:focus { border-color: #4A90D6; }
+  .input-area textarea { flex: 1; border: 1px solid #e0e0e0; border-radius: 12px; padding: 10px 14px; font-size: 14px; resize: none; outline: none; min-height: 40px; max-height: 100px; font-family: inherit; line-height: 1.4; }
+  .input-area textarea:focus { border-color: #4A90D6; }
+  .input-area .send-btn { background: #4A90D6; color: #fff; border: none; border-radius: 12px; padding: 10px 18px; font-size: 14px; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all 0.15s; }
+  .input-area .send-btn:disabled { background: #ccc; cursor: not-allowed; }
+  .input-area .trigger-hint { font-size: 10px; color: #aaa; text-align: center; margin-top: 2px; }
+
+  /* 配置弹窗 */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; align-items: flex-end; justify-content: center; z-index: 100; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: #fff; border-radius: 20px 20px 0 0; width: 100%; max-width: 500px; max-height: 85vh; overflow-y: auto; padding: 24px 20px 32px; animation: slideUp 0.25s ease; }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+  .modal .modal-title .close { font-size: 22px; color: #999; cursor: pointer; background: none; border: none; padding: 0; line-height: 1; }
+  .form-group { margin-bottom: 18px; }
+  .form-group label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #666; margin-bottom: 6px; }
+  .form-group label .hint-icon { color: #aaa; cursor: help; font-size: 14px; }
+  .form-group input, .form-group textarea, .form-group select { width: 100%; border: 1px solid #e0e0e0; border-radius: 10px; padding: 10px 14px; font-size: 14px; outline: none; font-family: inherit; transition: border-color 0.15s; }
+  .form-group textarea { min-height: 80px; resize: vertical; }
+  .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: #4A90D6; }
+  .form-row { display: flex; gap: 12px; }
+  .form-row .form-group { flex: 1; }
+  .save-btn { width: 100%; background: #4A90D6; color: #fff; border: none; border-radius: 12px; padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 8px; transition: background 0.15s; }
+  .save-btn:active { background: #3a7bc8; }
+  .delete-btn { width: 100%; background: none; color: #FF4D4F; border: 1px solid #FF4D4F; border-radius: 12px; padding: 12px; font-size: 14px; cursor: pointer; margin-top: 12px; transition: all 0.15s; }
+  .delete-btn:active { background: #fff1f0; }
+
+  /* Toast 提示 */
+  .toast { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 10px 20px; border-radius: 10px; font-size: 13px; z-index: 200; opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; }
+  .toast.show { opacity: 1; }
+
+  /* 分割线 - 自动对话提示 */
+  .auto-divider { text-align: center; font-size: 11px; color: #bbb; padding: 8px 0; display: none; }
+  .auto-divider.show { display: block; }
+</style>
+</head>
+<body>
+
+<div class="page" id="app">
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <!-- 顶部导航 -->
+  <div class="navbar">
+    <div class="back">←</div>
+    <div class="title">💡 如何设计用户注册流程</div>
+    <div class="actions">
+      <button class="action-btn" id="settingsBtn" onclick="toggleSettings()">⚙ 设置</button>
+    </div>
+  </div>
+
+  <!-- 模式切换 -->
+  <div class="mode-switch">
+    <div class="tab" :class="{active: mode==='single'}" onclick="switchMode('single')">🎭 单人模式</div>
+    <div class="tab active" onclick="switchMode('multi')">👥 多人模式</div>
+  </div>
+
+  <!-- 多人模式：角色栏 -->
+  <div class="persona-bar" id="personaBar">
+    <div class="persona-card active speaking" data-id="me" onclick="selectPersona(this, 'me')" oncontextmenu="openPersonaConfig(event, 'me')">
+      <div class="avatar me">我<div class="speaking"></div></div>
+      <div class="name">我</div>
+      <div class="longpress-hint">长按配置</div>
+    </div>
+    <div class="persona-card" data-id="pm" onclick="selectPersona(this, 'pm')" oncontextmenu="openPersonaConfig(event, 'pm')">
+      <div class="avatar ai1">P<div class="speaking"></div></div>
+      <div class="name">产品视角</div>
+      <div class="longpress-hint">长按配置</div>
+    </div>
+    <div class="persona-card" data-id="tech" onclick="selectPersona(this, 'tech')" oncontextmenu="openPersonaConfig(event, 'tech')">
+      <div class="avatar ai2">T<div class="speaking"></div></div>
+      <div class="name">技术视角</div>
+      <div class="longpress-hint">长按配置</div>
+    </div>
+    <div class="persona-card" data-id="design" onclick="selectPersona(this, 'design')" oncontextmenu="openPersonaConfig(event, 'design')">
+      <div class="avatar ai3">D<div class="speaking"></div></div>
+      <div class="name">设计视角</div>
+      <div class="longpress-hint">长按配置</div>
+    </div>
+    <div class="persona-card" onclick="openAddPersona()">
+      <div class="add-btn">+</div>
+      <div class="name" style="color:#ccc;">添加</div>
+    </div>
+  </div>
+
+  <!-- 单人模式：角色切换 -->
+  <div class="role-switch-bar" id="roleSwitchBar" style="display:none;">
+    <span class="label">当前视角：</span>
+    <select id="singleRoleSelect" onchange="switchSingleRole(this.value)">
+      <option value="me">🎭 我自己</option>
+      <option value="pm">👔 产品经理视角</option>
+      <option value="tech">⚙ 技术架构视角</option>
+      <option value="design">🎨 UX设计视角</option>
+    </select>
+    <span class="label" style="margin-left:auto;">💡 思维框架在发言下方显示</span>
+  </div>
+
+  <!-- 对话内容区 -->
+  <div class="chat-area" id="chatArea">
+    <!-- 多人模式消息 -->
+    <div class="message mine" data-mode="multi" data-msg-id="1">
+      <div class="msg-avatar-wrapper" oncontextmenu="openPersonaConfig(event, 'me')">
+        <div class="msg-avatar" style="background:linear-gradient(135deg,#4A90D6,#7B68EE);">我</div>
+        <div class="msg-name">我</div>
+      </div>
+      <div class="bubble-wrap">
+        <button class="msg-menu-btn" onclick="showMsgMenu(1,event)">⋯</button>
+        <div class="msg-menu" id="msgMenu-1">
+          <div class="msg-menu-item" onclick="copyMessage(1)">📋 复制</div>
+          <div class="msg-menu-item" onclick="openRefModal(1)">🔗 引用</div>
+          <div class="msg-menu-item delete" onclick="deleteMessage(1)">🗑 删除</div>
+        </div>
+        <div class="speaker"><span class="dot" style="background:#4A90D6;"></span> 我 · 09:05</div>
+        <div class="bubble" id="msgContent-1">各位，今天讨论注册流程优化，大家从不同角度分析一下？我先说说我的观察：目前短信验证码失败率偏高，约 40% 的用户在验证码环节流失。</div>
+      </div>
+    </div>
+
+    <div class="message" data-mode="multi" data-msg-id="2">
+      <div class="msg-avatar-wrapper" oncontextmenu="openPersonaConfig(event, 'pm')">
+        <div class="msg-avatar" style="background:linear-gradient(135deg,#FF6B6B,#FF8E53);">P</div>
+        <div class="msg-name">产品视角</div>
+      </div>
+      <div class="bubble-wrap">
+        <button class="msg-menu-btn" onclick="showMsgMenu(2,event)">⋯</button>
+        <div class="msg-menu" id="msgMenu-2">
+          <div class="msg-menu-item" onclick="copyMessage(2)">📋 复制</div>
+          <div class="msg-menu-item" onclick="openRefModal(2)">🔗 引用</div>
+          <div class="msg-menu-item delete" onclick="deleteMessage(2)">🗑 删除</div>
+        </div>
+        <div class="speaker"><span class="dot" style="background:#FF6B6B;"></span> 产品视角 · 09:06</div>
+        <div class="bubble" id="msgContent-2">这个数据很关键。从产品角度看，注册转化率的核心漏斗是：进入注册页 → 填写手机号 → 验证码到达 → 填写验证码 → 设置密码 → 完成。建议在验证码环节增加邮箱验证作为 fallback，同时引入第三方登录（微信/Apple ID）降低摩擦。</div>
+        <div class="framework-tag">🧠 分析框架：HEART 模型 → 用户旅程地图 → 优先级矩阵</div>
+      </div>
+    </div>
+
+    <div class="message" data-mode="multi" data-msg-id="3">
+      <div class="msg-avatar-wrapper" oncontextmenu="openPersonaConfig(event, 'tech')">
+        <div class="msg-avatar" style="background:linear-gradient(135deg,#4ECDC4,#44B09E);">T</div>
+        <div class="msg-name">技术视角</div>
+      </div>
+      <div class="bubble-wrap">
+        <button class="msg-menu-btn" onclick="showMsgMenu(3,event)">⋯</button>
+        <div class="msg-menu" id="msgMenu-3">
+          <div class="msg-menu-item" onclick="copyMessage(3)">📋 复制</div>
+          <div class="msg-menu-item" onclick="openRefModal(3)">🔗 引用</div>
+          <div class="msg-menu-item delete" onclick="deleteMessage(3)">🗑 删除</div>
+        </div>
+        <div class="speaker"><span class="dot" style="background:#4ECDC4;"></span> 技术视角 · 09:07</div>
+        <div class="bubble" id="msgContent-3">补充技术层面的考虑：短信服务需要保障 SLA 99.9%，建议用多通道降级（阿里云短信 + 腾讯云短信互备）。验证码存储用 Redis 设置 5 分钟过期，防止暴力破解。第三方登录需要对接 OAuth2.0，注意 state 参数防 CSRF。</div>
+        <div class="framework-tag">🧠 分析框架：技术可行性 → 性能瓶颈 → 安全合规 → 运维成本</div>
+      </div>
+    </div>
+
+    <div class="auto-divider" id="autoDivider">— 自动对话进行中（第 2/5 轮）—</div>
+
+    <!-- 单人模式消息（默认隐藏） -->
+    <div class="message mine" data-mode="single" style="display:none;" data-msg-id="4">
+      <div class="msg-avatar-wrapper">
+        <div class="msg-avatar" style="background:linear-gradient(135deg,#4A90D6,#7B68EE);">我</div>
+        <div class="msg-name">我自己</div>
+      </div>
+      <div class="bubble-wrap">
+        <button class="msg-menu-btn" onclick="showMsgMenu(4,event)">⋯</button>
+        <div class="msg-menu" id="msgMenu-4">
+          <div class="msg-menu-item" onclick="copyMessage(4)">📋 复制</div>
+          <div class="msg-menu-item" onclick="openRefModal(4)">🔗 引用</div>
+          <div class="msg-menu-item delete" onclick="deleteMessage(4)">🗑 删除</div>
+        </div>
+        <div class="speaker"><span class="dot" style="background:#4A90D6;"></span> 我自己（单人模式）</div>
+        <div class="bubble" id="msgContent-4">我觉得注册流程最关键的痛点是验证码体验太差，用户经常收不到短信。需要先梳理完整的用户旅程。</div>
+        <div class="framework-tag">🧠 当前视角框架：5W1H → 用户痛点识别 → 优先级排序</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 输入区 -->
+  <div class="input-area">
+    <div class="left-btns" id="multiOnlyControls">
+      <button class="auto-btn" id="autoBtn" onclick="toggleAutoDialogue()">
+        🤖 自动<br>对话
+      </button>
+      <div style="text-align:center;">
+        <input class="round-input" id="roundInput" type="number" value="5" min="1" max="50" title="对话轮次">
+      </div>
+      <div class="trigger-hint">轮</div>
+    </div>
+    <textarea id="msgInput" placeholder="输入你的想法...（多人模式下点击角色头像让其发言）" rows="1"></textarea>
+    <button class="send-btn" onclick="sendMessage()">发送</button>
+  </div>
+</div>
+
+<!-- 角色配置弹窗 -->
+<div class="modal-overlay" id="configModal">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">
+      <span id="modalTitle">⚙ 角色配置</span>
+      <button class="close" onclick="closeModal()">✕</button>
+    </div>
+
+    <div class="form-group">
+      <label>角色名称</label>
+      <input type="text" id="cfgName" value="产品视角" placeholder="如：产品经理视角">
+    </div>
+
+    <div class="form-group">
+      <label>角色类型</label>
+      <select id="cfgType">
+        <option value="ai">🤖 AI 角色（自动/手动发言）</option>
+        <option value="human">🧑 本人扮演（手动输入）</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>
+        人格设定（System Prompt）
+        <span class="hint-icon" title="这段 prompt 会作为 AI 的系统提示，决定它的专业背景、思维方式和发言风格">ℹ</span>
+      </label>
+      <textarea id="cfgPrompt" placeholder="描述这个角色的思考方式、专业背景、发言风格...">你是一位有8年经验的高级产品经理。擅长从用户价值出发分析问题，习惯用 HEART 框架评估功能价值。发言风格：结构化、有数据支撑、关注用户痛点。思考时会主动考虑商业价值与技术可行性的平衡。</textarea>
+    </div>
+
+    <div class="form-group">
+      <label>
+        分析框架（每日定时更新）
+        <span class="hint-icon" title="该角色发言时，会在消息下方显示此框架标签。框架内容将在每日凌晨 3:00 基于历史对话自动优化，若网页未打开则下次登录时更新。">ℹ</span>
+      </label>
+      <input type="text" id="cfgFramework" value="HEART 模型 → 用户旅程地图 → 优先级矩阵" placeholder="如：5W1H → SWOT → 决策矩阵">
+      <div style="font-size:11px;color:#aaa;margin-top:4px;">📅 下次更新时间：每日 03:00（或下次登录时）</div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>AI 模型</label>
+        <select id="cfgModel">
+          <option value="gpt-4o">GPT-4o（OpenAI）</option>
+          <option value="claude-3.5">Claude 3.5 Sonnet</option>
+          <option value="glm-4">GLM-4（智谱）</option>
+          <option value="ollama">本地 Ollama（免费）</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>温度系数</label>
+        <select id="cfgTemp">
+          <option value="0.3">0.3（严谨）</option>
+          <option value="0.7" selected>0.7（平衡）</option>
+          <option value="1.0">1.0（创意）</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>API Key（留空使用默认配置）</label>
+      <input type="password" id="cfgApiKey" placeholder="sk-..." value="sk-••••••••••••••••">
+    </div>
+
+    <div class="form-group">
+      <label>API Base URL（可选，留空使用默认）</label>
+      <input type="text" id="cfgApiBase" placeholder="https://api.openai.com/v1" value="">
+    </div>
+
+    <button class="save-btn" onclick="savePersona()">💾 保存配置</button>
+    <button class="delete-btn" id="deleteBtn" onclick="deletePersona()">🗑 删除此角色</button>
+  </div>
+</div>
+
+<script>
+  let mode = 'multi';
+  let currentPersona = 'me';
+  let autoDialogue = false;
+  let editingPersonaId = null; // null = 新增模式
+
+  // ========== 模式切换 ==========
+  function switchMode(m) {
+    mode = m;
+    document.querySelectorAll('.mode-switch .tab').forEach((t, i) => {
+      t.classList.toggle('active', (m === 'single' && i === 0) || (m === 'multi' && i === 1));
+    });
+    document.getElementById('personaBar').style.display = m === 'multi' ? 'flex' : 'none';
+    document.getElementById('roleSwitchBar').style.display = m === 'single' ? 'flex' : 'none';
+    document.querySelectorAll('#chatArea .message').forEach(el => {
+      el.style.display = el.dataset.mode === m ? 'flex' : 'none';
+    });
+    document.getElementById('multiOnlyControls').style.display = m === 'multi' ? 'flex' : 'none';
+  }
+
+  // ========== 多人模式：选择角色 ==========
+  function selectPersona(el, id) {
+    document.querySelectorAll('.persona-card[data-id]').forEach(c => c.classList.remove('active', 'speaking'));
+    el.classList.add('active', 'speaking');
+    currentPersona = id;
+    const input = document.getElementById('msgInput');
+    if (id === 'me') {
+      input.placeholder = '输入你的想法...';
+      showToast('💬 当前由你发言');
+    } else {
+      input.placeholder = `点击"让TA发言"或输入你的回复...`;
+      triggerAISpeak(id);
+    }
+  }
+
+  // ========== 长按/右键：打开角色配置 ==========
+  function openPersonaConfig(e, personaId) {
+    e.preventDefault();
+    editingPersonaId = personaId;
+    const cfg = personaConfigs[personaId] || {};
+    document.getElementById('modalTitle').textContent = personaId === 'me' ? '⚙ 我的角色设置' : `⚙ 配置「${cfg.name || personaId}」`;
+    document.getElementById('cfgName').value = cfg.name || personaId;
+    document.getElementById('cfgPrompt').value = cfg.prompt || '';
+    document.getElementById('cfgFramework').value = cfg.framework || '';
+    document.getElementById('cfgType').value = cfg.type || 'ai';
+    document.getElementById('cfgModel').value = cfg.model || 'gpt-4o';
+    document.getElementById('cfgTemp').value = cfg.temp || '0.7';
+    document.getElementById('cfgApiKey').value = cfg.apiKey || '';
+    document.getElementById('cfgApiBase').value = cfg.apiBase || '';
+    document.getElementById('deleteBtn').style.display = personaId === 'me' ? 'none' : 'block';
+    document.getElementById('configModal').classList.add('show');
+  }
+
+  // ========== 点击 + 号：新增角色 ==========
+  function openAddPersona() {
+    editingPersonaId = null;
+    document.getElementById('modalTitle').textContent = '⚙ 新增角色';
+    document.getElementById('cfgName').value = '';
+    document.getElementById('cfgPrompt').value = '';
+    document.getElementById('cfgFramework').value = '';
+    document.getElementById('cfgType').value = 'ai';
+    document.getElementById('cfgModel').value = 'gpt-4o';
+    document.getElementById('cfgTemp').value = '0.7';
+    document.getElementById('cfgApiKey').value = '';
+    document.getElementById('cfgApiBase').value = '';
+    document.getElementById('deleteBtn').style.display = 'none';
+    document.getElementById('configModal').classList.add('show');
+  }
+
+  // ========== 保存角色配置 ==========
+  let personaConfigs = {
+    pm: { name: '产品视角', prompt: '你是一位有8年经验的高级产品经理...', framework: 'HEART 模型 → 用户旅程地图 → 优先级矩阵', type: 'ai', model: 'gpt-4o', temp: '0.7' },
+    tech: { name: '技术视角', prompt: '你是一位资深后端架构师...', framework: '技术可行性 → 性能瓶颈 → 安全合规 → 运维成本', type: 'ai', model: 'gpt-4o', temp: '0.3' },
+    design: { name: '设计视角', prompt: '你是一位专注 UX 的高级设计师...', framework: '无障碍设计 → 信息架构 → 视觉层次 → 交互反馈', type: 'ai', model: 'claude-3.5', temp: '0.8' }
+  };
+
+  function savePersona() {
+    const name = document.getElementById('cfgName').value.trim();
+    if (!name) { showToast('⚠️ 请输入角色名称'); return; }
+    const cfg = {
+      name,
+      prompt: document.getElementById('cfgPrompt').value,
+      framework: document.getElementById('cfgFramework').value,
+      type: document.getElementById('cfgType').value,
+      model: document.getElementById('cfgModel').value,
+      temp: document.getElementById('cfgTemp').value,
+      apiKey: document.getElementById('cfgApiKey').value,
+      apiBase: document.getElementById('cfgApiBase').value,
+    };
+    if (editingPersonaId) {
+      personaConfigs[editingPersonaId] = cfg;
+      // 更新角色栏名称
+      const card = document.querySelector(`.persona-card[data-id="${editingPersonaId}"] .name`);
+      if (card) card.textContent = name;
+      showToast(`✅ 「${name}」配置已保存`);
+    } else {
+      // 新增角色
+      const newId = 'custom_' + Date.now();
+      personaConfigs[newId] = cfg;
+      addPersonaCard(newId, cfg);
+      showToast(`✅ 角色「${name}」已添加`);
+    }
+    closeModal();
+  }
+
+  function addPersonaCard(id, cfg) {
+    const bar = document.getElementById('personaBar');
+    const addCard = bar.querySelector('.persona-card:last-child');
+    const card = document.createElement('div');
+    card.className = 'persona-card';
+    card.dataset.id = id;
+    card.setAttribute('onclick', `selectPersona(this, '${id}')`);
+    card.setAttribute('oncontextmenu', `openPersonaConfig(event, '${id}')`);
+    const colors = ['#FF6B6B,#FF8E53','#4ECDC4,#44B09E','#FC5C7C,#6A82FB','#A18CD1,#FBC2EB'];
+    const ci = Object.keys(personaConfigs).length % colors.length;
+    card.innerHTML = `
+      <div class="avatar" style="background:linear-gradient(135deg,${colors[ci].replace(',',' , ')});">${cfg.name[0]}<div class="speaking"></div></div>
+      <div class="name">${cfg.name}</div>
+      <div class="longpress-hint">长按配置</div>
+    `;
+    bar.insertBefore(card, addCard);
+  }
+
+  function deletePersona() {
+    if (!editingPersonaId || editingPersonaId === 'me') return;
+    if (!confirm(`确定删除角色「${personaConfigs[editingPersonaId].name}」？`)) return;
+    delete personaConfigs[editingPersonaId];
+    const card = document.querySelector(`.persona-card[data-id="${editingPersonaId}"]`);
+    if (card) card.remove();
+    showToast('🗑 角色已删除');
+    closeModal();
+  }
+
+  // ========== 关闭弹窗 ==========
+  function closeModal() {
+    document.getElementById('configModal').classList.remove('show');
+  }
+  document.getElementById('configModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  // ========== AI 发言 ==========
+  const aiNames = { me: '我', pm: '产品视角', tech: '技术视角', design: '设计视角' };
+  const aiColors = { me: 'linear-gradient(135deg,#4A90D6,#7B68EE)', pm: 'linear-gradient(135deg,#FF6B6B,#FF8E53)', tech: 'linear-gradient(135deg,#4ECDC4,#44B09E)', design: 'linear-gradient(135deg,#FC5C7C,#6A82FB)' };
+  const aiFrameworks = {
+    pm: '🧠 分析框架：HEART 模型 → 用户旅程地图 → 优先级矩阵',
+    tech: '🧠 分析框架：技术可行性 → 性能瓶颈 → 安全合规 → 运维成本',
+    design: '🧠 分析框架：无障碍设计 → 信息架构 → 视觉层次 → 交互反馈'
+  };
+
+  function triggerAISpeak(id) {
+    showToast(`🤖 ${aiNames[id]} 正在思考...`);
+    // 显示"思考中"动画
+    const chatArea = document.getElementById('chatArea');
+    const thinking = document.createElement('div');
+    thinking.className = 'ai-thinking';
+    thinking.dataset.mode = 'multi';
+    thinking.innerHTML = `<div class="dots"><span></span><span></span><span></span></div><div class="label">${aiNames[id]} 正在思考...</div>`;
+    chatArea.appendChild(thinking);
+    chatArea.scrollTop = chatArea.scrollHeight;
+
+    setTimeout(() => {
+      thinking.remove();
+      const frameworks = { pm: '从产品角度补充：注册流程的登录后引导也很关键，新用户完成注册后应该有一个 quick win 的功能引导，提升 AHA! Moment 的概率。建议在注册成功页增加「3步快速上手」引导。', tech: '技术角度继续：关于数据存储，用户的注册信息需要加密存储，密码用 bcrypt 加盐哈希，手机号建议 AES-256 加密。同时需要考虑 GDPR 合规，增加用户数据导出和删除接口。', design: '从 UX 角度看：验证码输入建议用 4 位独立输入框 + 自动跳转，比单一输入框体验好很多。错误状态要用红色边框 + 文案提示「验证码已过期，点击重新获取」，不要只写「错误」。' };
+      addMessage(id, frameworks[id] || '从我的专业角度分析...', true);
+      // 自动对话模式下继续
+      if (autoDialogue) {
+        autoRoundCount++;
+        document.getElementById('autoDivider').textContent = `— 自动对话进行中（第 ${autoRoundCount}/${autoTotalRounds} 轮）—`;
+        if (autoRoundCount < autoTotalRounds) {
+          setTimeout(() => {
+            const nextId = getNextSpeaker(id);
+            selectPersona(document.querySelector(`.persona-card[data-id="${nextId}"]`), nextId);
+          }, 1500);
+        } else {
+          autoDialogue = false;
+          document.getElementById('autoBtn').classList.remove('active');
+          document.getElementById('autoDivider').classList.remove('show');
+          showToast('🛑 自动对话已结束（达到设定轮次）');
+        }
+      }
+    }, 1800);
+  }
+
+  // 自动对话：选择下一个发言者（简单轮流）
+  function getNextSpeaker(currentId) {
+    const ids = ['pm','tech','design'];
+    const ci = ids.indexOf(currentId);
+    return ids[(ci + 1) % ids.length];
+  }
+
+  // ========== 发送消息 ==========
+  function sendMessage() {
+    const input = document.getElementById('msgInput');
+    const text = input.value.trim();
+    if (!text) return;
+    addMessage('me', text, false);
+    input.value = '';
+    input.style.height = 'auto';
+
+    // 多人模式下，发送后自动切换到 AI 角色（如果开启了自动对话）
+    if (mode === 'multi' && autoDialogue) {
+      setTimeout(() => {
+        const nextId = getNextSpeaker('me');
+        selectPersona(document.querySelector(`.persona-card[data-id="${nextId}"]`), nextId);
+      }, 1000);
+    }
+  }
+
+  let msgIdCounter = 5;
+  function addMessage(speaker, text, isAI) {
+    const chatArea = document.getElementById('chatArea');
+    const div = document.createElement('div');
+    const msgId = msgIdCounter++;
+    div.className = 'message' + (speaker === 'me' ? ' mine' : '');
+    div.dataset.mode = mode;
+    div.dataset.msgId = msgId;
+    const framework = isAI ? (aiFrameworks[speaker] || '') : '';
+    const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    const dotColor = aiColors[speaker].split('linear-gradient(135deg,')[1].split(',')[0];
+    div.innerHTML = `
+      <div class="msg-avatar-wrapper" ${speaker !== 'me' ? `oncontextmenu="openPersonaConfig(event, '${speaker}')"` : ''}>
+        <div class="msg-avatar" style="background:${aiColors[speaker]};">${speaker === 'me' ? '我' : speaker.toUpperCase()[0]}</div>
+        <div class="msg-name">${aiNames[speaker] || speaker}</div>
+      </div>
+      <div class="bubble-wrap">
+        <button class="msg-menu-btn" onclick="showMsgMenu(${msgId},event)">⋯</button>
+        <div class="msg-menu" id="msgMenu-${msgId}">
+          <div class="msg-menu-item" onclick="copyMessage(${msgId})">📋 复制</div>
+          <div class="msg-menu-item" onclick="openRefModal(${msgId})">🔗 引用</div>
+          <div class="msg-menu-item delete" onclick="deleteMessage(${msgId})">🗑 删除</div>
+        </div>
+        <div class="speaker"><span class="dot" style="background:${dotColor};"></span> ${aiNames[speaker] || speaker} · ${time}</div>
+        <div class="bubble" id="msgContent-${msgId}">${text}</div>
+        ${framework ? `<div class="framework-tag">${framework}</div>` : ''}
+      </div>
+    `;
+    // 隐藏自动对话分割线（如果有）
+    const divider = document.getElementById('autoDivider');
+    chatArea.insertBefore(div, divider);
+    chatArea.scrollTop = chatArea.scrollHeight;
+  }
+
+  // ========== 自动对话切换 ==========
+  let autoRoundCount = 0;
+  let autoTotalRounds = 5;
+
+  function toggleAutoDialogue() {
+    autoTotalRounds = parseInt(document.getElementById('roundInput').value) || 5;
+    autoDialogue = !autoDialogue;
+    const btn = document.getElementById('autoBtn');
+    btn.classList.toggle('active', autoDialogue);
+    if (autoDialogue) {
+      autoRoundCount = 0;
+      document.getElementById('autoDivider').classList.add('show');
+      showToast(`🤖 自动对话已开启，将进行 ${autoTotalRounds} 轮（预留功能，当前仅手动触发）`);
+    } else {
+      document.getElementById('autoDivider').classList.remove('show');
+      showToast('🛑 自动对话已关闭');
+    }
+  }
+
+  // ========== 单人模式角色切换 ==========
+  function switchSingleRole(role) {
+    showToast(`🎭 已切换到「${document.getElementById('singleRoleSelect').selectedOptions[0].text}」视角`);
+  }
+
+  // ========== 消息卡片二级菜单 ==========
+  let activeMsgMenu = null;
+
+  function showMsgMenu(msgId, event) {
+    event.stopPropagation();
+    hideMsgMenu();
+    const menu = document.getElementById('msgMenu-' + msgId);
+    if (menu) {
+      menu.classList.add('show');
+      activeMsgMenu = menu;
+    }
+  }
+
+  function hideMsgMenu() {
+    if (activeMsgMenu) {
+      activeMsgMenu.classList.remove('show');
+      activeMsgMenu = null;
+    }
+  }
+
+  // 点击页面其他地方关闭菜单
+  document.addEventListener('click', function(e) {
+    if (activeMsgMenu && !e.target.closest('.msg-menu') && !e.target.closest('.msg-menu-btn')) {
+      hideMsgMenu();
+    }
+  });
+
+  function copyMessage(msgId) {
+    const content = document.getElementById('msgContent-' + msgId)?.textContent || '';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(content).then(() => showToast('📋 已复制到剪贴板'));
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = content;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast('📋 已复制到剪贴板');
+    }
+    hideMsgMenu();
+  }
+
+  function deleteMessage(msgId) {
+    const bubble = document.getElementById('msgContent-' + msgId);
+    if (bubble) {
+      bubble.innerHTML = '<span class="msg-deleted">此消息已删除</span>';
+      bubble.style.background = '#f5f5f5';
+      bubble.style.color = '#aaa';
+    }
+    // 同时移除菜单按钮
+    const menuBtn = bubble?.closest('.bubble-wrap')?.querySelector('.msg-menu-btn');
+    if (menuBtn) menuBtn.style.display = 'none';
+    showToast('🗑 消息已删除');
+    hideMsgMenu();
+  }
+
+  function openRefModal(msgId) {
+    hideMsgMenu();
+    showToast('🔗 打开引用选择弹窗（关联任务/原则）');
+    // 这里可以调用之前实现的引用弹窗逻辑
+  }
+
+  // ========== Toast ==========
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  // ========== 输入框自适应 ==========
+  document.getElementById('msgInput').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+  });
+
+  // 初始化
+  switchMode('multi');
+</script>
+</body>
+</html>

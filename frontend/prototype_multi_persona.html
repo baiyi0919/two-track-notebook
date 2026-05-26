@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device, initial-scale=1.0">
+<title>探索轨 - 多人模式原型</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; }
+
+  /* 顶部导航 */
+  .navbar { background: #fff; padding: 12px 20px; display: flex; align-items: center; border-bottom: 1px solid #e8e8e8; }
+  .navbar .back { color: #666; margin-right: 16px; cursor: pointer; font-size: 18px; }
+  .navbar .title { font-size: 17px; font-weight: 600; flex: 1; }
+  .navbar .actions { display: flex; gap: 12px; }
+  .navbar .action-btn { background: none; border: 1px solid #ddd; border-radius: 8px; padding: 6px 14px; font-size: 13px; cursor: pointer; color: #555; }
+  .navbar .action-btn.active { background: #4A90D6; color: #fff; border-color: #4A90D6; }
+
+  /* 模式切换 */
+  .mode-switch { display: flex; background: #f0f0f0; border-radius: 10px; padding: 3px; margin: 16px 20px 0; }
+  .mode-switch .tab { flex: 1; text-align: center; padding: 8px; border-radius: 8px; font-size: 14px; cursor: pointer; color: #888; transition: all 0.2s; }
+  .mode-switch .tab.active { background: #fff; color: #333; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+  /* 角色栏 */
+  .persona-bar { display: flex; gap: 12px; padding: 16px 20px; overflow-x: auto; border-bottom: 1px solid #eee; background: #fff; }
+  .persona-bar .hint { color: #aaa; font-size: 13px; align-self: center; }
+  .persona-card { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; min-width: 64px; }
+  .persona-card .avatar { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff; font-weight: 600; position: relative; }
+  .persona-card .avatar.me { background: linear-gradient(135deg, #4A90D6, #7B68EE); }
+  .persona-card .avatar.ai1 { background: linear-gradient(135deg, #FF6B6B, #FF8E53); }
+  .persona-card .avatar.ai2 { background: linear-gradient(135deg, #4ECDC4, #44B09E); }
+  .persona-card .avatar.ai3 { background: linear-gradient(135deg, #FC5C7C, #6A82FB); }
+  .persona-card .name { font-size: 11px; color: #666; max-width: 64px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .persona-card.active .name { color: #4A90D6; font-weight: 600; }
+  .persona-card .speaking { width: 8px; height: 8px; border-radius: 50%; background: #4A90D6; position: absolute; bottom: -2px; right: -2px; border: 2px solid #fff; display: none; }
+  .persona-card.speaking .speaking { display: block; }
+  .persona-card .add-btn { width: 44px; height: 44px; border-radius: 50%; border: 2px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #ccc; background: #fafafa; }
+
+  /* 对话区 */
+  .chat-area { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 16px; }
+  .message { display: flex; gap: 10px; max-width: 85%; }
+  .message.mine { flex-direction: row-reverse; align-self: flex-end; }
+  .message .msg-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #fff; flex-shrink: 0; margin-top: 2px; }
+  .message .bubble { background: #fff; border-radius: 14px; padding: 12px 16px; font-size: 14px; line-height: 1.6; color: #333; box-shadow: 0 1px 2px rgba(0,0,0,0.04); position: relative; }
+  .message.mine .bubble { background: #4A90D6; color: #fff; border-bottom-right-radius: 4px; }
+  .message:not(.mine) .bubble { border-bottom-left-radius: 4px; }
+  .message .speaker { font-size: 11px; color: #999; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+  .message .speaker .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+  .message .framework-tag { display: inline-block; background: #f0f4ff; color: #4A90D6; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-top: 6px; }
+  .message .ref-tag { display: inline-flex; align-items: center; gap: 3px; background: #f9f9f9; border: 1px solid #eee; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-top: 6px; color: #666; cursor: pointer; }
+  .ai-thinking { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: #fafafa; border-radius: 14px; border-bottom-left-radius: 4px; max-width: 85%; }
+  .ai-thinking .dots { display: flex; gap: 4px; }
+  .ai-thinking .dots span { width: 6px; height: 6px; border-radius: 50%; background: #ccc; animation: blink 1.2s infinite; }
+  .ai-thinking .dots span:nth-child(2) { animation-delay: 0.2s; }
+  .ai-thinking .dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%,80%,100% { opacity: 0.3; } 40% { opacity: 1; } }
+  .ai-thinking .label { font-size: 12px; color: #aaa; }
+
+  /* 输入区 */
+  .input-area { display: flex; align-items: flex-end; gap: 10px; padding: 12px 20px; background: #fff; border-top: 1px solid #eee; }
+  .input-area textarea { flex: 1; border: 1px solid #e0e0e0; border-radius: 12px; padding: 10px 14px; font-size: 14px; resize: none; outline: none; min-height: 40px; max-height: 100px; font-family: inherit; }
+  .input-area textarea:focus { border-color: #4A90D6; }
+  .input-area .send-btn { background: #4A90D6; color: #fff; border: none; border-radius: 12px; padding: 10px 20px; font-size: 14px; cursor: pointer; white-space: nowrap; }
+  .input-area .send-btn:disabled { background: #ccc; }
+
+  /* 配置弹窗遮罩 */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: flex-end; justify-content: center; z-index: 100; }
+  .modal { background: #fff; border-radius: 20px 20px 0 0; width: 100%; max-width: 500px; max-height: 80vh; overflow-y: auto; padding: 24px 20px 32px; }
+  .modal .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+  .modal .modal-title .close { font-size: 22px; color: #999; cursor: pointer; background: none; border: none; }
+  .form-group { margin-bottom: 18px; }
+  .form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 6px; }
+  .form-group input, .form-group textarea, .form-group select { width: 100%; border: 1px solid #e0e0e0; border-radius: 10px; padding: 10px 14px; font-size: 14px; outline: none; font-family: inherit; }
+  .form-group textarea { min-height: 80px; resize: vertical; }
+  .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: #4A90D6; }
+  .form-row { display: flex; gap: 12px; }
+  .form-row .form-group { flex: 1; }
+  .save-btn { width: 100%; background: #4A90D6; color: #fff; border: none; border-radius: 12px; padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+  .delete-btn { width: 100%; background: none; color: #FF4D4F; border: 1px solid #FF4D4F; border-radius: 12px; padding: 12px; font-size: 14px; cursor: pointer; margin-top: 12px; }
+
+  /* 角色类型标签 */
+  .type-tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: 6px; }
+  .type-tag.human { background: #E6F7FF; color: #1890FF; }
+  .type-tag.ai { background: #F6FFED; color: #52C41A; }
+
+  /* 页面容器 */
+  .page { display: flex; flex-direction: column; height: 100vh; max-width: 500px; margin: 0 auto; background: #f5f5f5; position: relative; }
+  .page-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* 单人模式提示 */
+  .single-mode-hint { text-align: center; padding: 40px 20px; color: #aaa; font-size: 13px; }
+  .single-mode-hint .icon { font-size: 40px; margin-bottom: 12px; }
+  .role-switch-bar { display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: #fff; border-bottom: 1px solid #eee; }
+  .role-switch-bar .label { font-size: 12px; color: #999; }
+  .role-switch-bar select { border: 1px solid #e0e0e0; border-radius: 8px; padding: 4px 10px; font-size: 13px; outline: none; }
+</style>
+</head>
+<body>
+
+<div class="page" id="app">
+  <!-- 顶部导航 -->
+  <div class="navbar">
+    <div class="back">←</div>
+    <div class="title">💡 如何设计用户注册流程</div>
+    <div class="actions">
+      <button class="action-btn" onclick="toggleSettings()">⚙ 设置</button>
+    </div>
+  </div>
+
+  <!-- 模式切换 -->
+  <div class="mode-switch">
+    <div class="tab" :class="{active: mode==='single'}" onclick="switchMode('single')">🎭 单人模式</div>
+    <div class="tab" :class="{active: mode==='multi'}" onclick="switchMode('multi')">👥 多人模式</div>
+  </div>
+
+  <!-- 多人模式：角色栏 -->
+  <div class="persona-bar" id="personaBar" style="display:none;">
+    <div class="persona-card active speaking" onclick="selectPersona(this, 'me')">
+      <div class="avatar me">我<div class="speaking"></div></div>
+      <div class="name">我</div>
+    </div>
+    <div class="persona-card" onclick="selectPersona(this, 'pm')">
+      <div class="avatar ai1">P<div class="speaking"></div></div>
+      <div class="name">产品视角</div>
+    </div>
+    <div class="persona-card" onclick="selectPersona(this, 'tech')">
+      <div class="avatar ai2">T<div class="speaking"></div></div>
+      <div class="name">技术视角</div>
+    </div>
+    <div class="persona-card" onclick="selectPersona(this, 'design')">
+      <div class="avatar ai3">D<div class="speaking"></div></div>
+      <div class="name">设计视角</div>
+    </div>
+    <div class="persona-card" onclick="openPersonaConfig()">
+      <div class="add-btn">+</div>
+      <div class="name" style="color:#ccc;">添加</div>
+    </div>
+  </div>
+
+  <!-- 单人模式：角色切换 -->
+  <div class="role-switch-bar" id="roleSwitchBar" style="display:none;">
+    <span class="label">当前视角：</span>
+    <select onchange="switchSingleRole(this.value)">
+      <option value="me">🎭 我自己</option>
+      <option value="pm">👔 产品经理视角</option>
+      <option value="tech">⚙ 技术架构视角</option>
+      <option value="design">🎨 UX设计视角</option>
+    </select>
+    <span class="label" style="margin-left:auto;">💡 思维框架会在发言下方显示</span>
+  </div>
+
+  <!-- 对话内容区 -->
+  <div class="page-content">
+    <div class="chat-area" id="chatArea">
+
+      <!-- 单人模式示例消息 -->
+      <div class="message" data-mode="single">
+        <div class="msg-avatar" style="background:linear-gradient(135deg,#4A90D6,#7B68EE);">我</div>
+        <div>
+          <div class="speaker"><span class="dot" style="background:#4A90D6;"></span> 我自己</div>
+          <div class="bubble">我觉得注册流程最关键的痛点是验证码体验太差，用户经常收不到短信。</div>
+          <div class="framework-tag">🧠 思维框架：5W1H → 用户痛点识别 → 优先级排序</div>
+        </div>
+      </div>
+
+      <div class="message" data-mode="single">
+        <div class="msg-avatar" style="background:linear-gradient(135deg,#FF6B6B,#FF8E53);">P</div>
+        <div>
+          <div class="speaker"><span class="dot" style="background:#FF6B6B;"></span> 产品经理视角（模拟）</div>
+          <div class="bubble">从产品角度看，注册转化率流失主要发生在：1）短信验证码 45% 失败率 2）密码规则过于复杂导致放弃。建议引入邮箱验证作为备选，同时优化密码强度提示的交互。</div>
+          <div class="framework-tag">🧠 思维框架：用户体验漏斗 → HEART 指标 → A/B 测试方案</div>
+        </div>
+      </div>
+
+      <!-- 多人模式示例消息 -->
+      <div class="message" data-mode="multi">
+        <div class="msg-avatar" style="background:linear-gradient(135deg,#4A90D6,#7B68EE);">我</div>
+        <div>
+          <div class="speaker"><span class="dot" style="background:#4A90D6;"></span> 我</div>
+          <div class="bubble">各位，今天讨论注册流程优化，大家从不同角度分析一下？</div>
+        </div>
+      </div>
+
+      <div class="message" data-mode="multi">
+        <div class="msg-avatar" style="background:linear-gradient(135deg,#FF6B6B,#FF8E53);">P</div>
+        <div>
+          <div class="speaker"><span class="dot" style="background:#FF6B6B;"></span> 产品视角</div>
+          <div class="bubble">我从用户价值角度分析：注册流程的核心 KPI 是转化率。当前主要流失点在验证码环节，建议增加邮箱验证作为 fallback，同时引入第三方登录（微信/Apple ID）。</div>
+          <div class="framework-tag">🧠 分析框架：HEART 模型 → 用户旅程地图 → 优先级矩阵</div>
+          <div class="ref-tag">📎 引用自：消息 #3</div>
+        </div>
+      </div>
+
+      <div class="ai-thinking" data-mode="multi">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <div class="label">技术视角 正在思考...</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 输入区 -->
+  <div class="input-area">
+    <textarea placeholder="输入你的想法...（多人模式下可 @角色 让其发言）" id="msgInput" rows="1"></textarea>
+    <button class="send-btn" onclick="sendMessage()">发送</button>
+  </div>
+</div>
+
+<!-- 角色配置弹窗 -->
+<div class="modal-overlay" id="configModal" style="display:none;" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">
+      ⚙ 角色配置
+      <button class="close" onclick="closeModal()">✕</button>
+    </div>
+
+    <div class="form-group">
+      <label>角色名称</label>
+      <input type="text" value="产品经理视角" placeholder="如：产品经理视角">
+    </div>
+
+    <div class="form-group">
+      <label>角色类型</label>
+      <select>
+        <option>AI 角色（自动发言）</option>
+        <option>我自己扮演（手动输入）</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>人格设定（System Prompt）</label>
+      <textarea placeholder="描述这个角色的思考方式、专业背景、发言风格...">你是一位有8年经验的高级产品经理。擅长从用户价值出发分析问题，习惯用 HEART 框架评估功能价值。发言风格：结构化、有数据支撑、关注用户痛点。思考时会主动考虑商业价值与技术可行性的平衡。</textarea>
+    </div>
+
+    <div class="form-group">
+      <label>分析框架（会在发言下方显示）</label>
+      <input type="text" value="HEART 模型 → 用户旅程地图 → 优先级矩阵" placeholder="如：5W1H → SWOT → 决策矩阵">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>AI 模型</label>
+        <select>
+          <option>GPT-4o（OpenAI）</option>
+          <option>Claude 3.5 Sonnet（Anthropic）</option>
+          <option>GLM-4（智谱）</option>
+          <option>本地 Ollama（免费）</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>温度系数</label>
+        <select>
+          <option>0.3（严谨）</option>
+          <option selected>0.7（平衡）</option>
+          <option>1.0（创意）</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>API Key（留空使用默认）</label>
+      <input type="password" placeholder="sk-..." value="sk-••••••••••••••••">
+    </div>
+
+    <div class="form-group">
+      <label>API Base URL（可选）</label>
+      <input type="text" placeholder="https://api.openai.com/v1" value="">
+    </div>
+
+    <button class="save-btn" onclick="savePersona()">💾 保存配置</button>
+    <button class="delete-btn" onclick="deletePersona()">🗑 删除此角色</button>
+  </div>
+</div>
+
+<script>
+  let mode = 'multi';  // 'single' | 'multi'
+  let currentPersona = 'me';
+
+  // 初始化显示
+  document.addEventListener('DOMContentLoaded', () => {
+    switchMode('multi');
+  });
+
+  function switchMode(m) {
+    mode = m;
+    document.querySelectorAll('.mode-switch .tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`.mode-switch .tab:nth-child(${m==='single'?1:2})`).classList.add('active');
+
+    const personaBar = document.getElementById('personaBar');
+    const roleSwitchBar = document.getElementById('roleSwitchBar');
+    const chatArea = document.getElementById('chatArea');
+
+    if (m === 'multi') {
+      personaBar.style.display = 'flex';
+      roleSwitchBar.style.display = 'none';
+      // 显示多人模式消息，隐藏单人模式消息
+      document.querySelectorAll('.message, .ai-thinking').forEach(el => {
+        el.style.display = el.dataset.mode === 'multi' ? 'flex' : 'none';
+      });
+    } else {
+      personaBar.style.display = 'none';
+      roleSwitchBar.style.display = 'flex';
+      document.querySelectorAll('.message, .ai-thinking').forEach(el => {
+        el.style.display = el.dataset.mode === 'single' ? 'flex' : 'none';
+      });
+    }
+  }
+
+  function selectPersona(el, personaId) {
+    document.querySelectorAll('.persona-card').forEach(c => c.classList.remove('active', 'speaking'));
+    el.classList.add('active', 'speaking');
+    currentPersona = personaId;
+
+    if (personaId !== 'me') {
+      // 模拟 AI 角色被点击后"准备发言"的状态
+      const input = document.getElementById('msgInput');
+      input.placeholder = `点击"让TA发言"或直接输入你的回复...`;
+      // 显示"让TA发言"按钮
+      showSpeakButton(personaId);
+    }
+  }
+
+  function showSpeakButton(personaId) {
+    // 简化：直接触发 AI 回复
+    const names = { me: '我', pm: '产品视角', tech: '技术视角', design: '设计视角' };
+    addMessage(personaId, `${names[personaId]} 从${names[personaId]}的角度分析：这个问题需要从多个维度考虑。首先...（AI 生成内容）`, true);
+  }
+
+  function addMessage(speaker, text, isAI = false) {
+    const chatArea = document.getElementById('chatArea');
+    const colors = { me: 'linear-gradient(135deg,#4A90D6,#7B68EE)', pm: 'linear-gradient(135deg,#FF6B6B,#FF8E53)', tech: 'linear-gradient(135deg,#4ECDC4,#44B09E)', design: 'linear-gradient(135deg,#FC5C7C,#6A82FB)' };
+    const names = { me: '我', pm: '产品视角', tech: '技术视角', design: '设计视角' };
+    const frameworks = { pm: '🧠 分析框架：HEART 模型 → 用户旅程地图 → 优先级矩阵', tech: '🧠 分析框架：技术可行性 → 性能瓶颈 → 安全合规', design: '🧠 分析框架：无障碍设计 → 信息架构 → 视觉层次' };
+
+    const div = document.createElement('div');
+    div.className = 'message';
+    div.dataset.mode = mode;
+    div.innerHTML = `
+      <div class="msg-avatar" style="background:${colors[speaker]};">${speaker === 'me' ? '我' : speaker.toUpperCase()[0]}</div>
+      <div>
+        <div class="speaker"><span class="dot" style="background:${colors[speaker].split('linear-gradient(135deg,')[1].split(',')[0]};"></span> ${names[speaker]}</div>
+        <div class="bubble">${text}</div>
+        ${isAI ? `<div class="framework-tag">${frameworks[speaker]}</div>` : ''}
+      </div>
+    `;
+    chatArea.appendChild(div);
+    chatArea.scrollTop = chatArea.scrollHeight;
+  }
+
+  function sendMessage() {
+    const input = document.getElementById('msgInput');
+    const text = input.value.trim();
+    if (!text) return;
+    addMessage('me', text);
+    input.value = '';
+
+    // 多人模式下，模拟 AI 角色自动回复
+    if (mode === 'multi') {
+      setTimeout(() => {
+        addMessage('tech', '从技术架构角度，这个方案需要考虑：1）短信服务的 SLA 保障 2）数据库写入的并发压力 3）验证码防刷机制。建议用 Redis 做限流，引入消息队列异步处理。', true);
+      }, 1500);
+    }
+  }
+
+  function openPersonaConfig() {
+    document.getElementById('configModal').style.display = 'flex';
+  }
+
+  function closeModal(e) {
+    if (e.target === e.currentTarget || e.target.classList.contains('close')) {
+      document.getElementById('configModal').style.display = 'none';
+    }
+  }
+
+  function savePersona() {
+    alert('✅ 角色配置已保存！\n\n（原型演示，实际会调用后端 API 保存）');
+    document.getElementById('configModal').style.display = 'none';
+  }
+
+  function deletePersona() {
+    if (confirm('确定删除此角色？')) {
+      alert('（原型演示）角色已删除');
+      document.getElementById('configModal').style.display = 'none';
+    }
+  }
+
+  function switchSingleRole(role) {
+    alert(`（原型演示）已切换到「${role}」视角，后续发言会以此角色身份记录`);
+  }
+
+  // 输入框自适应高度
+  document.getElementById('msgInput').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+  });
+</script>
+
+</body>
+</html>
