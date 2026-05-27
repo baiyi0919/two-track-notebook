@@ -168,6 +168,11 @@ export function deletePersonaConfig(id: number) {
   return http.delete(`/persona-configs/${id}`)
 }
 
+// ============ AI 代理（多人模式） ============
+export function aiChat(threadId: number, personaId: number) {
+  return http.post<any>('/ai/chat', { threadId, personaId })
+}
+
 // ============ 分析框架（多人模式） ============
 export function getAnalysisFramework(personaId: number) {
   return http.get<any>(`/analysis-frameworks?personaId=${personaId}`)
@@ -178,5 +183,25 @@ export function saveOrUpdateAnalysisFramework(personaId: number, content: string
 }
 
 export function updateAnalysisFrameworkNextUpdateTime(personaId: number, nextTime: string) {
-  return http.put<any>(`/analysis-frameworks/next-update-time?personaId=${personaId}&nextTime=${nextTime}`)
+  return http.put<any>(`/analysis-frameworks/next-update-time?personaId=${personaId}&nextTime=${encodeURIComponent(nextTime)}`)
+}
+
+/** 获取当前用户待更新框架数量 */
+export function getFrameworkPendingCount() {
+  return http.get<number>('/analysis-frameworks/pending-count')
+}
+
+/** 立即触发某个角色的框架更新 */
+export function triggerFrameworkUpdate(personaId: number) {
+  return http.post<any>(`/analysis-frameworks/trigger-update?personaId=${personaId}`)
+}
+
+/** 获取当前用户待更新的框架列表 */
+export function getFrameworkPendingList() {
+  return http.get<any[]>('/analysis-frameworks/pending-list')
+}
+
+/** 批量补全当前用户所有AI角色的框架记录（修复历史数据） */
+export function ensureAllFrameworks() {
+  return http.post<number>('/analysis-frameworks/ensure-all')
 }
