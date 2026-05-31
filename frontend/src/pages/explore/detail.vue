@@ -481,6 +481,7 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getThreadDetail, getMessageList, sendMessage, closeThread, updateThread, deleteThread, createPrinciple, createReference, deleteReference, getReferencesBySource, getBacklinksByTarget, getTaskList, getPrincipleList,
   getPersonaConfigList, createPersonaConfig, updatePersonaConfig, deletePersonaConfig,
+  getThreadPersonas, addPersonaToThread, hidePersonaFromThread,
   aiChat, getFrameworkPendingCount, getFrameworkPendingList, ensureAllFrameworks, triggerFrameworkUpdate,
   getAnalysisFramework
 } from '@/api'
@@ -517,7 +518,8 @@ const roles = ref([
 const currentRole = ref('我')
 
 // ============ 多角色相关 ============
-const personas = ref<any[]>([])  // 角色列表（从后端加载）
+const personas = ref<any[]>([])  // 当前议题激活的角色列表（从 thread_persona 表加载）
+const allPersonas = ref<any[]>([]) // 所有全局角色（用于消息头像回退查找）
 const currentPersonaId = ref<number>(0)  // 0 = 本地默认"我"
 const showPersonaModal = ref(false)  // 角色配置弹窗
 const editingPersonaId = ref<number>(0)  // 0=新建，>0=编辑
@@ -691,8 +693,10 @@ onLoad((options: any) => {
   const id = Number(options?.id || 0)
   if (id) {
     threadId.value = id
-    loadData()
-    loadPersonas()
+    // 确保先加载 allPersonas，再加载消息（用于 roleName 回退查找）
+    loadPersonas().then(() => {
+      loadData()
+    })
     checkPendingUpdates()
   } else {
     loading.value = false
@@ -723,6 +727,13 @@ async function loadData() {
       })
     )
     messages.value = msgsWithRefs
+    // 补全 roleName（兼容角色在当前议题被隐藏的情况）
+    messages.value.forEach((msg: any) => {
+      if (!msg.roleName && msg.personaId) {
+        const p = allPersonas.value.find((p: any) => p.id === msg.personaId)
+        if (p) msg.roleName = p.name
+      }
+    })
     await nextTick()
     scrollToBottom()
   } catch (e: any) {
@@ -950,17 +961,37 @@ function isAIMsg(msg: any): boolean {
   return false
 }
 
-// 加载角色列表
+// 加载当前议题的角色列表（从 thread_persona 表读取）
 async function loadPersonas() {
   try {
-    const res: any = await getPersonaConfigList()
+    // 优先从议题关联表加载
+    const res: any = await getThreadPersonas(threadId.value)
+    const threadPersonas = res.data || []
+
+    // 同时加载全局角色配置（用于获取详细信息，也用于消息头像回退）
+    const allRes: any = await getPersonaConfigList()
+    const globalList = allRes.data || []
+    allPersonas.value = globalList
+
+    // 将议题关联记录与全局角色配置合并
+    const merged = threadPersonas.map((tp: any) => {
+      const config = globalList.find((p: any) => p.id === tp.personaId)
+      return {
+        ...config,
+        id: tp.personaId,
+        threadPersonaId: tp.id,
+        isDeletedInThread: tp.isDeleted,
+        sortOrder: tp.sortOrder
+      }
+    })
+
     // 添加本地默认"我"
     const localMe = { id: 0, name: '我', avatar: '👤', type: 'human', isAI: false }
-    personas.value = [localMe, ...(res.data || [])]
+    personas.value = [localMe, ...merged]
 
     // 如果没有选中的角色，默认选中"我"
     if (currentPersonaId.value === 0 && personas.value.length > 0) {
-      currentPersonaId.value = 0  // 默认选中"我"
+      currentPersonaId.value = 0
     }
   } catch (e) {
     console.error('加载角色列表失败', e)
@@ -1113,37 +1144,42 @@ function handleMsgAvatarLongPress(msg: any) {
   openPersonaModal(pid)
 }
 
-// 删除角色
+// 从议题中隐藏角色（仅本议题不可见，不影响其他议题）
 async function handleDeletePersona() {
   if (editingPersonaId.value <= 0) return
   uni.showModal({
-    title: '确认删除',
-    content: `确定要删除角色「${personaForm.value.name}」吗？`,
-    confirmText: '删除',
+    title: '隐藏角色',
+    content: `确定要在本议题中隐藏角色「${personaForm.value.name}」吗？\n（其他议题不受影响）`,
+    confirmText: '隐藏',
     confirmColor: '#E17055',
     success: async (res) => {
       if (res.confirm) {
         try {
-          await deletePersonaConfig(editingPersonaId.value)
-          uni.showToast({ title: '已删除', icon: 'success' })
+          await hidePersonaFromThread(threadId.value, editingPersonaId.value)
+          uni.showToast({ title: '已隐藏（仅本议题）', icon: 'success' })
           showPersonaModal.value = false
           await loadPersonas()
           if (currentPersonaId.value === editingPersonaId.value) {
             currentPersonaId.value = 0
           }
         } catch (e: any) {
-          uni.showToast({ title: e?.message || '删除失败', icon: 'none' })
+          uni.showToast({ title: e?.message || '操作失败', icon: 'none' })
         }
       }
     }
   })
 }
 
-// 获取消息对应的角色头像
+// 获取消息对应的角色头像（优先从当前议题角色中查找，找不到则回退到全局角色列表）
 function getMsgAvatar(msg: any): string {
   if (!msg.personaId || msg.personaId === 0) return '👤'
-  const p = personas.value.find((p: any) => p.id === msg.personaId)
-  return p ? (p.avatar || '👤') : '👤'
+  // 先在当前议题激活角色中查找
+  let p = personas.value.find((p: any) => p.id === msg.personaId)
+  // 找不到（角色已被隐藏），回退到全局角色列表
+  if (!p) {
+    p = allPersonas.value.find((p: any) => p.id === msg.personaId)
+  }
+  return p ? (p.avatar || '👤') : (msg.roleName || '👤')
 }
 
 // 点击消息头像（暂不特殊处理）
@@ -1162,8 +1198,16 @@ async function savePersona() {
       await updatePersonaConfig(editingPersonaId.value, personaForm.value)
       uni.showToast({ title: '更新成功', icon: 'success' })
     } else {
-      await createPersonaConfig(personaForm.value)
+      const res: any = await createPersonaConfig(personaForm.value)
       uni.showToast({ title: '创建成功', icon: 'success' })
+      // 新建成功后，自动添加到当前议题
+      if (res && res.data && res.data.id) {
+        try {
+          await addPersonaToThread(threadId.value, res.data.id)
+        } catch (e) {
+          console.warn('自动添加到议题失败', e)
+        }
+      }
     }
     showPersonaModal.value = false
     await loadPersonas()

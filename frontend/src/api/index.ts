@@ -168,6 +168,22 @@ export function deletePersonaConfig(id: number) {
   return http.delete(`/persona-configs/${id}`)
 }
 
+// ============ 议题-角色关联（多对多） ============
+/** 获取某议题中激活的角色列表 */
+export function getThreadPersonas(threadId: number) {
+  return http.get<any[]>(`/api/thread-personas?threadId=${threadId}`)
+}
+
+/** 为议题添加角色（如已隐藏则恢复显示） */
+export function addPersonaToThread(threadId: number, personaId: number) {
+  return http.post<any>(`/api/thread-personas?threadId=${threadId}&personaId=${personaId}`)
+}
+
+/** 从议题中隐藏角色（软删除，不影响其他议题） */
+export function hidePersonaFromThread(threadId: number, personaId: number) {
+  return http.delete(`/api/thread-personas?threadId=${threadId}&personaId=${personaId}`)
+}
+
 // ============ AI 代理（多人模式） ============
 export function aiChat(threadId: number, personaId: number) {
   return http.post<any>('/ai/chat', { threadId, personaId })
