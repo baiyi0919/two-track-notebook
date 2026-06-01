@@ -1,6 +1,6 @@
-// H5开发模式走Vite代理，小程序/生产环境用完整地址
-// 注意：uni-app条件编译在.ts文件中不生效，这里用运行时判断
-const BASE_URL = import.meta.env.DEV ? '/api' : 'http://127.0.0.1:8080/api'
+// H5开发模式走Vite代理，生产环境用Railway后端地址
+const isDev = import.meta.env.DEV
+const BASE_URL = isDev ? '/api' : 'https://two-track-notebook-production.up.railway.app/api'
 
 interface RequestOptions {
   url: string
