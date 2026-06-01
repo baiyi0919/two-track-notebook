@@ -829,7 +829,7 @@ async function handleSend() {
     await sendMessage(threadId.value, {
       roleName: currentRole.value,
       content: inputText.value.trim(),
-      personaId: currentPersonaId.value === 0 ? 0 : (currentPersonaId.value || undefined)
+      personaId: currentPersonaId.value === 0 ? undefined : (currentPersonaId.value || undefined)
     })
     inputText.value = ''
     await loadData()
