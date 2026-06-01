@@ -1,0 +1,26 @@
+# Railway 部署配置
+# 文档：https://docs.railway.com/deployment/configuration
+
+[project]
+name = "two-track-notebook"
+
+# ========== 后端 Spring Boot ==========
+[[services]]
+name = "backend"
+src = "backend"
+numReplicas = 1
+
+[services.variables]
+SPRING_PROFILES_ACTIVE = "railway"
+# Railway 会自动注入 MySQL 连接信息，见下文
+
+[[services.prestart]]
+name = "Build JAR"
+command = """cmd /c "set JAVA_HOME=D:\\mytools\\jdk17 && C:\\apache-maven-3.9.9\\bin\\mvn.cmd package -DskipTests""""
+
+
+# ========== MySQL 数据库 ==========
+[[services]]
+name = "mysql"
+type = "mysql"
+ң
