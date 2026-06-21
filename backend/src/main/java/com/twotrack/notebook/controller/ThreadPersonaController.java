@@ -11,7 +11,7 @@ import java.util.List;
 
 @SaCheckLogin
 @RestController
-@RequestMapping("/api/thread-personas")
+@RequestMapping("/thread-personas")
 @RequiredArgsConstructor
 public class ThreadPersonaController {
 
