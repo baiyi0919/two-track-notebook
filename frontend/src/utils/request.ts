@@ -1,6 +1,6 @@
-// H5开发模式走Vite代理，生产环境用Railway后端地址
+// H5开发模式走Vite代理，生产环境用腾讯云服务器地址
 const isDev = import.meta.env.DEV
-const BASE_URL = isDev ? '/api' : 'https://two-track-notebook-production.up.railway.app/api'
+const BASE_URL = isDev ? '/api' : 'http://82.156.153.104/api'
 
 interface RequestOptions {
   url: string
